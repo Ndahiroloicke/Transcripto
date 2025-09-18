@@ -68,6 +68,14 @@
   background: #45a049 !important;
 }
 
+.mts-btn-warning {
+  background: #ff9800 !important;
+}
+
+.mts-btn-warning:hover {
+  background: #f57c00 !important;
+}
+
 .mts-controls {
   display: flex !important;
   align-items: center !important;

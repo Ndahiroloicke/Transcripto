@@ -42,7 +42,14 @@
       '.ytp-caption-segment',
       '.captions-text',
       '.ytp-caption-window-container',
-      '.ytp-caption-window-rollup'
+      '.ytp-caption-window-rollup',
+      '.ytp-caption-window-bottom',
+      '.ytp-caption-window-top',
+      '.ytp-caption-window',
+      '[class*="caption"]',
+      '[class*="subtitle"]',
+      '.html5-video-player .captions-text',
+      '.html5-video-player [class*="caption"]'
     ]
   };
 
@@ -91,12 +98,56 @@
 
   const findCaptionElements = () => {
     const selectors = SELECTOR_MAP[SITE] || [];
+    console.log(`🔍 Looking for captions with ${selectors.length} selectors for ${SITE}:`, selectors);
+    
+    const allElements = [];
     for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length > 0) {
-        return Array.from(elements);
+      try {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          console.log(`✅ Found ${elements.length} elements with selector: ${selector}`);
+          allElements.push(...Array.from(elements));
+        }
+      } catch (error) {
+        console.warn(`❌ Invalid selector: ${selector}`, error);
       }
     }
+    
+    // Filter for elements with actual text content
+    const validElements = allElements.filter(element => {
+      const text = extractTextFromNode(element);
+      return text && text.length > 0;
+    });
+    
+    console.log(`📝 Total valid caption elements found: ${validElements.length}`);
+    
+    if (validElements.length > 0) {
+      validElements.forEach((element, index) => {
+        const text = extractTextFromNode(element);
+        console.log(`📄 Caption element ${index + 1}:`, {
+          tag: element.tagName,
+          className: element.className,
+          text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+          visible: element.offsetWidth > 0 && element.offsetHeight > 0
+        });
+      });
+      return validElements;
+    }
+    
+    // If no valid elements found, let's debug what's available
+    console.log('🔍 No valid caption elements found. Checking for any caption-like elements...');
+    const allCaptionLike = document.querySelectorAll('[class*="caption"], [class*="subtitle"], [class*="transcript"]');
+    if (allCaptionLike.length > 0) {
+      console.log(`📋 Found ${allCaptionLike.length} caption-like elements:`, 
+        Array.from(allCaptionLike).map(el => ({
+          tag: el.tagName,
+          className: el.className,
+          text: extractTextFromNode(el).substring(0, 50),
+          visible: el.offsetWidth > 0 && el.offsetHeight > 0
+        }))
+      );
+    }
+    
     return [];
   };
 
@@ -224,7 +275,11 @@
         }).then(() => {
           console.log('✅ Export request sent successfully');
         }).catch(error => {
-          console.error('❌ Export request failed:', error);
+          console.error('❌ Export request failed, using local export:', error);
+          // If auto-export fails due to context invalidation, export locally
+          if (localTranscriptBuffer.length > 0) {
+            exportLocalTranscript();
+          }
         });
       } else {
         console.error('❌ No sessionId available for export');
@@ -339,10 +394,22 @@
     console.log('📝 Stored transcript locally:', data.text?.substring(0, 50) + '...');
   };
 
+  // Show the local export button when extension context is invalid
+  const showLocalExportButton = () => {
+    const localExportBtn = document.getElementById('mts-local-export-btn');
+    if (localExportBtn) {
+      localExportBtn.style.display = 'inline-flex';
+      localExportBtn.title = `Download Local Transcript (${localTranscriptBuffer.length} entries)`;
+    }
+  };
+
   // Show persistent notification about context invalidation
   const showContextInvalidNotification = () => {
     if (contextInvalidNotificationShown) return;
     contextInvalidNotificationShown = true;
+    
+    // Show the local export button
+    showLocalExportButton();
     
     const notification = document.createElement('div');
     notification.id = 'mts-context-notification';
@@ -365,7 +432,8 @@
     notification.innerHTML = `
       <div style="font-weight: 600; margin-bottom: 8px;">⚠️ Extension Connection Lost</div>
       <div style="font-size: 13px; opacity: 0.9; margin-bottom: 10px;">
-        Transcript is being saved locally. Your data won't be lost!
+        Transcript is being saved locally. Your data won't be lost!<br>
+        Use the orange "Local" button to download your transcript.
       </div>
       <div style="display: flex; gap: 8px;">
         <button onclick="window.location.reload()" style="
@@ -512,10 +580,10 @@ ${transcript}`;
   const processNewCaption = debounce((text) => {
     if (!text || text === lastProcessedText || !isCapturing) return;
     
-    // Check if extension context is still valid
-    if (!isExtensionContextValid()) {
-      console.warn('⚠️ Extension context invalidated, stopping caption processing');
-      return;
+    const contextValid = isExtensionContextValid();
+    if (!contextValid) {
+      console.warn('⚠️ Extension context invalidated, using local storage only');
+      showContextInvalidNotification();
     }
     
     // Find new content by comparing with last processed text
@@ -551,13 +619,22 @@ ${transcript}`;
       })
     };
 
-    // Send to background script safely
-    safeSendMessage({
-      type: 'NEW_CAPTION',
-      payload: captionData
-    }).catch(error => {
-      console.warn('⚠️ Failed to send caption data:', error.message);
-    });
+    // Always store locally first
+    storeLocalTranscriptData(captionData);
+    
+    // Send to background script only if context is valid
+    if (contextValid) {
+      safeSendMessage({
+        type: 'NEW_CAPTION',
+        payload: captionData
+      }).catch(error => {
+        console.warn('⚠️ Failed to send caption data:', error.message);
+        // Ensure local storage even if sending fails
+        storeLocalTranscriptData(captionData);
+      });
+    } else {
+      console.log('📝 Stored caption locally (context invalid):', cleanText.substring(0, 50) + '...');
+    }
 
     // Update sidebar if open
     if (sidebar && sidebar.isVisible) {
@@ -649,12 +726,22 @@ ${transcript}`;
           setTimeout(() => {
             exportBtn.innerHTML = '<span class="mts-icon">💾</span><span class="mts-text">Export</span>';
           }, 2000);
+          // If export fails, show local export option
+          showLocalExportButton();
         });
       } else {
         console.log('❌ No active session to export');
         alert('No active transcript session to export. Start capturing first!');
       }
     });
+
+    // Local export button event listener
+    const localExportBtn = document.getElementById('mts-local-export-btn');
+    if (localExportBtn) {
+      localExportBtn.addEventListener('click', () => {
+        exportLocalTranscript();
+      });
+    }
 
     floatingUI = {
       container,
@@ -860,49 +947,9 @@ ${transcript}`;
 
     // Check if extension context is valid before initializing
     if (!isExtensionContextValid()) {
-      console.warn('⚠️ Extension context is invalid, please refresh the page');
-      
-      // Show a user-friendly notification
-      const notification = document.createElement('div');
-      notification.style.cssText = `
-        position: fixed !important;
-        top: 20px !important;
-        right: 20px !important;
-        background: #ff5722 !important;
-        color: white !important;
-        padding: 16px 20px !important;
-        border-radius: 8px !important;
-        z-index: 2147483647 !important;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-        font-size: 14px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-        max-width: 300px !important;
-      `;
-      notification.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 8px;">⚠️ Extension Reload Required</div>
-        <div style="font-size: 13px; opacity: 0.9;">Please refresh this page to use Meeting Transcript Saver</div>
-        <button onclick="window.location.reload()" style="
-          background: rgba(255,255,255,0.2) !important;
-          border: 1px solid rgba(255,255,255,0.3) !important;
-          color: white !important;
-          padding: 6px 12px !important;
-          border-radius: 4px !important;
-          margin-top: 8px !important;
-          cursor: pointer !important;
-          font-size: 12px !important;
-        ">Refresh Page</button>
-      `;
-      
-      document.body.appendChild(notification);
-      
-      // Auto-remove after 10 seconds
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 10000);
-      
-      return;
+      console.warn('⚠️ Extension context is invalid, continuing in local-only mode');
+      showContextInvalidNotification();
+      // Don't return - continue with local-only functionality
     }
 
     console.log(`🚀 Meeting Transcript Saver: Initialized for ${SITE}`);

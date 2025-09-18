@@ -314,18 +314,26 @@ async function exportSession(session, format = null) {
         throw new Error(`Unsupported export format: ${exportFormat}`);
     }
     
-    // Create blob and download
+    // Create blob and download using data URL
     const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
+    const reader = new FileReader();
     
-    await chrome.downloads.download({
-      url,
-      filename,
-      saveAs: false
+    return new Promise((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          await chrome.downloads.download({
+            url: reader.result,
+            filename,
+            saveAs: false
+          });
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
     });
-    
-    // Clean up blob URL
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
     
     // Show notification
     if (chrome.notifications) {
