@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Transcript Saver - Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f8f9fa;
+      line-height: 1.6;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header h1 {
+      margin: 0;
+      color: #333;
+      font-size: 28px;
+    }
+    
+    .header p {
+      margin: 10px 0 0 0;
+      color: #666;
+    }
+    
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .section h2 {
+      margin: 0 0 20px 0;
+      color: #333;
+      font-size: 20px;
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 8px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #2196F3;
+      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+    
+    .checkbox-group label {
+      margin: 0;
+      cursor: pointer;
+    }
+    
+    .description {
+      font-size: 13px;
+      color: #666;
+      margin-top: 4px;
+    }
+    
+    .btn {
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 12px 24px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    
+    .btn:hover {
+      background: #1976D2;
+    }
+    
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .btn-success {
+      background: #28a745;
+    }
+    
+    .btn-success:hover {
+      background: #218838;
+    }
+    
+    .btn-danger {
+      background: #dc3545;
+    }
+    
+    .btn-danger:hover {
+      background: #c82333;
+    }
+    
+    .actions {
+      text-align: center;
+      margin-top: 30px;
+    }
+    
+    .actions .btn {
+      margin: 0 8px;
+    }
+    
+    .status-message {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .status-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .status-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .sessions-management {
+      margin-top: 20px;
+    }
+    
+    .sessions-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: #f8f9fa;
+      padding: 16px;
+      border-radius: 6px;
+      text-align: center;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .stat-number {
+      font-size: 24px;
+      font-weight: 600;
+      color: #2196F3;
+    }
+    
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      margin-top: 4px;
+    }
+    
+    .danger-zone {
+      border: 1px solid #dc3545;
+      border-radius: 6px;
+      padding: 20px;
+      background: #fff5f5;
+    }
+    
+    .danger-zone h3 {
+      color: #dc3545;
+      margin: 0 0 12px 0;
+    }
+    
+    .danger-zone p {
+      color: #666;
+      margin: 0 0 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📝 Meeting Transcript Saver</h1>
+    <p>Configure your transcript capture and export settings</p>
+  </div>
+  
+  <div id="status-message" class="status-message"></div>
+  
+  <!-- Export Settings -->
+  <div class="section">
+    <h2>Export Settings</h2>
+    
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="checkbox" id="auto-export" />
+        <label for="auto-export">Automatically export transcripts when meetings end</label>
+      </div>
+      <div class="description">When enabled, transcripts will be automatically saved to your Downloads folder when a session ends.</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="export-format">Default export format</label>
+      <select id="export-format">
+        <option value="txt">Plain Text (.txt)</option>
+        <option value="md">Markdown (.md)</option>
+        <option value="json">JSON (.json)</option>
+      </select>
+      <div class="description">Choose the default format for exported transcripts.</div>
+    </div>
+  </div>
+  
+  <!-- Storage Settings -->
+  <div class="section">
+    <h2>Storage Settings</h2>
+    
+    <div class="form-group">
+      <label for="retention-days">Keep transcripts for (days)</label>
+      <input type="number" id="retention-days" min="0" max="365" />
+      <div class="description">Transcripts older than this will be automatically deleted. Set to 0 to keep forever.</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="max-session-size">Maximum lines per session</label>
+      <input type="number" id="max-session-size" min="1000" max="50000" step="1000" />
+      <div class="description">Limit the number of caption lines stored per session to prevent excessive memory usage.</div>
+    </div>
+  </div>
+  
+  <!-- Session Management -->
+  <div class="section">
+    <h2>Session Management</h2>
+    
+    <div class="sessions-stats">
+      <div class="stat-card">
+        <div class="stat-number" id="total-sessions">-</div>
+        <div class="stat-label">Total Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="total-captions">-</div>
+        <div class="stat-label">Total Captions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="storage-used">-</div>
+        <div class="stat-label">Storage Used</div>
+      </div>
+    </div>
+    
+    <div class="sessions-management">
+      <button class="btn btn-success" id="export-all">Export All Sessions</button>
+      <button class="btn" id="cleanup-old">Clean Up Old Sessions</button>
+    </div>
+    
+    <div class="danger-zone">
+      <h3>⚠️ Danger Zone</h3>
+      <p>This action will permanently delete all saved transcript sessions and cannot be undone.</p>
+      <button class="btn btn-danger" id="delete-all">Delete All Sessions</button>
+    </div>
+  </div>
+  
+  <!-- Platform Settings -->
+  <div class="section">
+    <h2>Platform Settings</h2>
+    
+    <div class="form-group">
+      <label>Supported Platforms</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="enable-zoom" checked disabled />
+        <label for="enable-zoom">Zoom Web Client</label>
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="enable-meet" checked disabled />
+        <label for="enable-meet">Google Meet</label>
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="enable-teams" checked disabled />
+        <label for="enable-teams">Microsoft Teams</label>
+      </div>
+      <div class="description">Platform support is currently always enabled. Future versions may allow selective enabling.</div>
+    </div>
+  </div>
+  
+  <!-- About -->
+  <div class="section">
+    <h2>About</h2>
+    <p><strong>Version:</strong> 0.1.0</p>
+    <p><strong>Description:</strong> Capture live meeting captions from web meeting apps and auto-save transcripts locally.</p>
+    <p><strong>Privacy:</strong> All transcripts are stored locally on your device. No data is sent to external servers unless you explicitly export to cloud services.</p>
+  </div>
+  
+  <div class="actions">
+    <button class="btn btn-success" id="save-settings">Save Settings</button>
+    <button class="btn" id="reset-settings">Reset to Defaults</button>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>

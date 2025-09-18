@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196F3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1976D2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Document background -->
+  <rect x="4" y="2" width="14" height="20" rx="2" ry="2" fill="url(#grad)" stroke="#1565C0" stroke-width="0.5"/>
+  
+  <!-- Document lines (transcript lines) -->
+  <line x1="7" y1="6" x2="15" y2="6" stroke="white" stroke-width="0.8" opacity="0.9"/>
+  <line x1="7" y1="8.5" x2="15" y2="8.5" stroke="white" stroke-width="0.8" opacity="0.9"/>
+  <line x1="7" y1="11" x2="13" y2="11" stroke="white" stroke-width="0.8" opacity="0.9"/>
+  <line x1="7" y1="13.5" x2="15" y2="13.5" stroke="white" stroke-width="0.8" opacity="0.9"/>
+  <line x1="7" y1="16" x2="12" y2="16" stroke="white" stroke-width="0.8" opacity="0.9"/>
+  <line x1="7" y1="18.5" x2="14" y2="18.5" stroke="white" stroke-width="0.8" opacity="0.9"/>
+  
+  <!-- Microphone icon overlay (small) -->
+  <circle cx="16" cy="8" r="3" fill="#FF5722" stroke="white" stroke-width="0.8"/>
+  <circle cx="16" cy="8" r="1.5" fill="white"/>
+  <line x1="16" y1="10" x2="16" y2="11" stroke="white" stroke-width="1"/>
+  <line x1="14.5" y1="11" x2="17.5" y2="11" stroke="white" stroke-width="1"/>
+</svg>

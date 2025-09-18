@@ -1,0 +1,234 @@
+/* styles.css - Styles for Meeting Transcript Saver UI */
+
+/* Floating button container */
+.mts-floating-container {
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 20px !important;
+  z-index: 2147483647 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 14px !important;
+}
+
+/* Main floating button */
+.mts-btn {
+  background: #4CAF50 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 10px 16px !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.2s ease !important;
+  outline: none !important;
+}
+
+.mts-btn:hover {
+  background: #45a049 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+.mts-btn:active {
+  transform: translateY(0) !important;
+}
+
+.mts-btn.mts-active {
+  background: #f44336 !important;
+}
+
+.mts-btn.mts-active:hover {
+  background: #da190b !important;
+}
+
+.mts-btn-small {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+}
+
+.mts-btn-primary {
+  background: #2196F3 !important;
+}
+
+.mts-btn-primary:hover {
+  background: #1976D2 !important;
+}
+
+.mts-btn-success {
+  background: #4CAF50 !important;
+}
+
+.mts-btn-success:hover {
+  background: #45a049 !important;
+}
+
+.mts-controls {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* Icon and text in button */
+.mts-icon {
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+.mts-text {
+  font-weight: 500 !important;
+}
+
+/* Status indicator */
+.mts-status {
+  margin-top: 4px !important;
+  font-size: 11px !important;
+  color: #666 !important;
+  text-align: center !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  min-height: 16px !important;
+}
+
+/* Sidebar */
+.mts-sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 350px !important;
+  height: 100vh !important;
+  background: white !important;
+  border-left: 1px solid #ddd !important;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1) !important;
+  z-index: 2147483646 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transition: transform 0.3s ease !important;
+}
+
+.mts-sidebar-hidden {
+  transform: translateX(100%) !important;
+}
+
+/* Sidebar header */
+.mts-sidebar-header {
+  padding: 16px !important;
+  border-bottom: 1px solid #eee !important;
+  background: #f8f9fa !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.mts-sidebar-header h3 {
+  margin: 0 !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+.mts-sidebar-controls {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+/* Sidebar content */
+.mts-sidebar-content {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 16px !important;
+}
+
+.mts-empty-state {
+  text-align: center !important;
+  color: #666 !important;
+  font-style: italic !important;
+  margin-top: 40px !important;
+}
+
+/* Transcript entries */
+.mts-transcript-entry {
+  margin-bottom: 16px !important;
+  padding: 12px !important;
+  background: #f8f9fa !important;
+  border-radius: 8px !important;
+  border-left: 3px solid #2196F3 !important;
+}
+
+.mts-entry-time {
+  font-size: 11px !important;
+  color: #666 !important;
+  margin-bottom: 4px !important;
+  font-family: monospace !important;
+}
+
+.mts-entry-content {
+  color: #333 !important;
+  line-height: 1.4 !important;
+}
+
+.mts-entry-content strong {
+  color: #2196F3 !important;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .mts-sidebar {
+    width: 100% !important;
+  }
+  
+  .mts-floating-container {
+    right: 16px !important;
+    bottom: 16px !important;
+  }
+}
+
+/* Animation for new entries */
+@keyframes mts-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mts-transcript-entry {
+  animation: mts-slide-in 0.3s ease !important;
+}
+
+/* Scrollbar styling for sidebar */
+.mts-sidebar-content::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.mts-sidebar-content::-webkit-scrollbar-track {
+  background: #f1f1f1 !important;
+}
+
+.mts-sidebar-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1 !important;
+  border-radius: 3px !important;
+}
+
+.mts-sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8 !important;
+}
+
+/* Ensure high specificity to override site styles */
+[id="mts-floating"] * {
+  box-sizing: border-box !important;
+}
+
+[id="mts-sidebar"] * {
+  box-sizing: border-box !important;
+}

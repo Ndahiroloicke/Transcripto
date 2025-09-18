@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Meeting Transcript Saver",
+  "version": "0.1.0",
+  "description": "Capture live meeting captions from web meeting apps and auto-save transcripts locally.",
+  "permissions": [
+    "storage",
+    "downloads",
+    "activeTab",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "*://*.zoom.us/*",
+    "*://meet.google.com/*",
+    "*://*.teams.microsoft.com/*",
+    "*://*.youtube.com/*",
+    "*://youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["*://*.zoom.us/*", "*://meet.google.com/*", "*://*.teams.microsoft.com/*", "*://*.youtube.com/*", "*://youtube.com/*"],
+      "js": ["contentScript.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Transcript Saver</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 0;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+    }
+    
+    .header {
+      background: #2196F3;
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .content {
+      padding: 16px;
+    }
+    
+    .status-section {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .status-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .status-label {
+      font-weight: 500;
+      color: #333;
+    }
+    
+    .status-value {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-left: 8px;
+    }
+    
+    .status-active {
+      background: #4CAF50;
+    }
+    
+    .status-inactive {
+      background: #ccc;
+    }
+    
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .btn {
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+      text-align: center;
+    }
+    
+    .btn:hover {
+      background: #1976D2;
+    }
+    
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+    
+    .btn-success {
+      background: #28a745;
+    }
+    
+    .btn-success:hover {
+      background: #218838;
+    }
+    
+    .btn-danger {
+      background: #dc3545;
+    }
+    
+    .btn-danger:hover {
+      background: #c82333;
+    }
+    
+    .sessions-section {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      border: 1px solid #e0e0e0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .sessions-title {
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    
+    .session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .session-item:last-child {
+      border-bottom: none;
+    }
+    
+    .session-info {
+      flex: 1;
+    }
+    
+    .session-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    .session-meta {
+      font-size: 11px;
+      color: #666;
+    }
+    
+    .session-actions {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .btn-small {
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+    }
+    
+    .empty-sessions {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      font-size: 14px;
+    }
+    
+    .loading {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .footer {
+      padding: 12px 16px;
+      text-align: center;
+      border-top: 1px solid #e0e0e0;
+      background: white;
+    }
+    
+    .footer a {
+      color: #2196F3;
+      text-decoration: none;
+      font-size: 12px;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📝 Meeting Transcript Saver</h1>
+  </div>
+  
+  <div class="content">
+    <!-- Status Section -->
+    <div class="status-section">
+      <div class="status-item">
+        <span class="status-label">Status</span>
+        <span class="status-value" id="capture-status">
+          <span id="status-text">Checking...</span>
+          <span class="status-indicator" id="status-indicator"></span>
+        </span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Platform</span>
+        <span class="status-value" id="platform">Unknown</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Captions</span>
+        <span class="status-value" id="captions-detected">Checking...</span>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button class="btn" id="toggle-capture">
+        <span id="toggle-text">Start Capture</span>
+      </button>
+      <button class="btn btn-secondary" id="toggle-sidebar">Show Live Transcript</button>
+      <button class="btn btn-success" id="export-current">Export Current Session</button>
+    </div>
+    
+    <!-- Recent Sessions -->
+    <div class="sessions-section">
+      <div class="sessions-title">Recent Sessions</div>
+      <div id="sessions-list" class="loading">Loading sessions...</div>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <a href="#" id="open-options">Settings</a>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
