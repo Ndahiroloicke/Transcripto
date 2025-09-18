@@ -49,15 +49,25 @@
       '[class*="caption"]',
       '[class*="subtitle"]',
       '.html5-video-player .captions-text',
-      '.html5-video-player [class*="caption"]'
+      '.html5-video-player [class*="caption"]',
+      // YouTube Shorts specific selectors
+      '.reel-video-in-sequence [class*="caption"]',
+      '.shorts-player [class*="caption"]',
+      '.shorts-video-container [class*="caption"]',
+      '#shorts-player [class*="caption"]',
+      '[data-layer="4"] [class*="caption"]',
+      '.caption-visual-line',
+      '.ytp-caption-window-container *'
     ]
   };
 
   // State management
   let isCapturing = false;
   let lastProcessedText = '';
+  let lastPolledText = '';
   let sessionId = null;
   let captionObserver = null;
+  let captionPollingInterval = null;
   let floatingUI = null;
   let sidebar = null;
 
@@ -65,7 +75,7 @@
   let youtubePlayer = null;
   let videoEndObserver = null;
   let speakerDiarization = {
-    enabled: SITE === 'youtube',
+    enabled: false, // Disabled - causes false positives without real audio analysis
     speakers: new Map(), // voice patterns to speaker mapping
     currentSpeaker: null,
     speakerCount: 0,
@@ -88,6 +98,24 @@
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
     };
+  };
+
+  // Calculate text similarity (0 = completely different, 1 = identical)
+  const calculateTextSimilarity = (text1, text2) => {
+    if (!text1 || !text2) return 0;
+    if (text1 === text2) return 1;
+    
+    // Simple word-based similarity
+    const words1 = text1.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const words2 = text2.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    
+    if (words1.length === 0 && words2.length === 0) return 1;
+    if (words1.length === 0 || words2.length === 0) return 0;
+    
+    const commonWords = words1.filter(word => words2.includes(word));
+    const totalWords = Math.max(words1.length, words2.length);
+    
+    return commonWords.length / totalWords;
   };
 
   const extractTextFromNode = (node) => {
@@ -113,10 +141,38 @@
       }
     }
     
-    // Filter for elements with actual text content
+    // Filter for elements with actual caption text content (not UI elements)
     const validElements = allElements.filter(element => {
       const text = extractTextFromNode(element);
-      return text && text.length > 0;
+      if (!text || text.length === 0) return false;
+      
+      // Filter out common non-caption elements
+      const lowerText = text.toLowerCase();
+      const trimmedText = text.trim();
+      
+      // More comprehensive filtering
+      const isTimeDisplay = /^\d+:\d+(\s*\/\s*\d+:\d+)?$/.test(trimmedText);
+      const isVideoMetadata = element.closest('.yt-video-attribute-view-model') !== null;
+      const isPlayerControl = element.closest('.ytp-chrome-controls') !== null;
+      const isVideoTitle = element.closest('#title') !== null || element.closest('.title') !== null;
+      const isChannelInfo = lowerText.includes('hillsong') || lowerText.includes('soundtrack') || lowerText.includes('movie');
+      const isTooltip = lowerText.includes('pull up for precise seeking') || lowerText.includes('subtitles/closed captions');
+      const isPlayerUI = trimmedText.match(/^\d+\s+\d+:\d+\s*\/\s*\d+:\d+$/) || // "06 0:04 / 9:36"
+                        trimmedText.match(/^\(\w\)\s+\d+:\d+\s*\/\s*\d+:\d+$/); // "(c) 0:29 / 9:36"
+      
+      // Only include elements that are specifically caption containers
+      const isCaptionContainer = element.classList.contains('ytp-caption-segment') ||
+                                element.classList.contains('caption-visual-line') ||
+                                (element.classList.contains('captions-text') && 
+                                 element.closest('.ytp-caption-window-container'));
+      
+      if (isTimeDisplay || isVideoMetadata || isPlayerControl || isVideoTitle || isChannelInfo || isTooltip || isPlayerUI) {
+        console.log(`🚫 Filtered out non-caption element: "${text.substring(0, 50)}..."`);
+        return false;
+      }
+      
+      // Only return true if it's definitely a caption element AND has meaningful text
+      return isCaptionContainer && text.length > 5;
     });
     
     console.log(`📝 Total valid caption elements found: ${validElements.length}`);
@@ -578,7 +634,14 @@ ${transcript}`;
 
   // Process new caption text
   const processNewCaption = debounce((text) => {
-    if (!text || text === lastProcessedText || !isCapturing) return;
+    if (!text || !isCapturing) return;
+    
+    // Better deduplication using similarity
+    const similarity = calculateTextSimilarity(text, lastProcessedText);
+    if (similarity > 0.7) {
+      console.log(`🔄 Skipping similar text (similarity: ${similarity.toFixed(2)})`);
+      return;
+    }
     
     const contextValid = isExtensionContextValid();
     if (!contextValid) {
@@ -620,7 +683,7 @@ ${transcript}`;
     };
 
     // Always store locally first
-    storeLocalTranscriptData(captionData);
+    storeTranscriptLocally(captionData);
     
     // Send to background script only if context is valid
     if (contextValid) {
@@ -630,7 +693,7 @@ ${transcript}`;
       }).catch(error => {
         console.warn('⚠️ Failed to send caption data:', error.message);
         // Ensure local storage even if sending fails
-        storeLocalTranscriptData(captionData);
+        storeTranscriptLocally(captionData);
       });
     } else {
       console.log('📝 Stored caption locally (context invalid):', cleanText.substring(0, 50) + '...');
@@ -651,16 +714,52 @@ ${transcript}`;
     }
 
     captionObserver = new MutationObserver((mutations) => {
+      console.log(`🔄 MutationObserver triggered with ${mutations.length} mutations, isCapturing: ${isCapturing}`);
+      
       if (!isCapturing) return;
 
       const captionElements = findCaptionElements();
+      console.log(`📝 Found ${captionElements.length} caption elements in observer`);
+      
       if (captionElements.length === 0) return;
 
-      // Process text from all caption elements
-      const allText = captionElements
+      // Process text from all caption elements and deduplicate
+      const captionTexts = captionElements
         .map(extractTextFromNode)
         .filter(text => text.length > 0)
-        .join(' ');
+        .map(text => {
+          // Clean up the text - remove timestamps and duplicates
+          let cleanText = text.replace(/\d+:\d+\s*\/\s*\d+:\d+/g, '').trim();
+          
+          // Remove excessive repetition within the same text
+          const words = cleanText.split(/\s+/);
+          const uniqueWords = [];
+          let lastWord = '';
+          let repeatCount = 0;
+          
+          for (const word of words) {
+            if (word === lastWord) {
+              repeatCount++;
+              if (repeatCount < 3) { // Allow up to 2 repetitions
+                uniqueWords.push(word);
+              }
+            } else {
+              uniqueWords.push(word);
+              repeatCount = 0;
+            }
+            lastWord = word;
+          }
+          
+          return uniqueWords.join(' ');
+        })
+        .filter(text => text.length > 5);
+      
+      // Get the longest/most complete text (usually the most recent caption)
+      const allText = captionTexts.length > 0 ? captionTexts[captionTexts.length - 1] : '';
+      console.log(`📄 Cleaned caption texts: ${captionTexts.length} texts, selected: "${allText.substring(0, 100)}..."`);
+      
+
+      console.log(`📄 Extracted text from captions: "${allText.substring(0, 100)}..."`);
 
       if (allText) {
         processNewCaption(allText);
@@ -729,10 +828,20 @@ ${transcript}`;
           // If export fails, show local export option
           showLocalExportButton();
         });
-      } else {
-        console.log('❌ No active session to export');
-        alert('No active transcript session to export. Start capturing first!');
-      }
+        } else {
+          console.log('❌ No active session to export');
+          // Check if we have local data to export
+          if (localTranscriptBuffer.length > 0) {
+            console.log(`📝 No active session but found ${localTranscriptBuffer.length} local entries, exporting...`);
+            exportLocalTranscript();
+            exportBtn.textContent = '✓ Local Export!';
+            setTimeout(() => {
+              exportBtn.innerHTML = '<span class="mts-icon">💾</span><span class="mts-text">Export</span>';
+            }, 2000);
+          } else {
+            alert('No transcript data available. Make sure captions are enabled and start capturing first!');
+          }
+        }
     });
 
     // Local export button event listener
@@ -761,13 +870,24 @@ ${transcript}`;
     if (isCapturing) {
       stopCapture();
     } else {
-      startCapture();
+      // Force check captions before starting
+      console.log('🔍 Force checking captions before starting...');
+      const captionElements = findCaptionElements();
+      if (captionElements.length > 0) {
+        console.log('✅ Captions found, starting capture');
+        startCapture();
+      } else {
+        console.log('❌ No captions found, starting anyway (captions might appear later)');
+        startCapture();
+      }
     }
   };
 
   const startCapture = () => {
+    console.log('🎬 Starting capture...');
     isCapturing = true;
     sessionId = `session_${Date.now()}`;
+    console.log(`📝 Session ID: ${sessionId}, isCapturing: ${isCapturing}`);
     
     // Reset speaker differentiation state
     if (SITE === 'youtube') {
@@ -780,7 +900,83 @@ ${transcript}`;
       setupVideoEndDetection();
     }
     
+    console.log('🔍 Setting up caption observer...');
     setupCaptionObserver();
+    
+    // Add polling as fallback for YouTube (captions might not trigger mutations)
+    if (SITE === 'youtube') {
+      console.log('⏰ Setting up caption polling for YouTube...');
+      if (captionPollingInterval) {
+        clearInterval(captionPollingInterval);
+      }
+      
+      captionPollingInterval = setInterval(() => {
+        if (!isCapturing) {
+          clearInterval(captionPollingInterval);
+          return;
+        }
+        
+        console.log('🔍 Polling for captions...');
+        const captionElements = findCaptionElements();
+        console.log(`📝 Polling found ${captionElements.length} caption elements`);
+        
+        if (captionElements.length > 0) {
+          // Process and clean caption text (same logic as MutationObserver)
+          const captionTexts = captionElements
+            .map(extractTextFromNode)
+            .filter(text => text.length > 0)
+            .map(text => {
+              // Clean up the text - remove timestamps and duplicates
+              let cleanText = text.replace(/\d+:\d+\s*\/\s*\d+:\d+/g, '').trim();
+              
+              // Remove excessive repetition within the same text
+              const words = cleanText.split(/\s+/);
+              const uniqueWords = [];
+              let lastWord = '';
+              let repeatCount = 0;
+              
+              for (const word of words) {
+                if (word === lastWord) {
+                  repeatCount++;
+                  if (repeatCount < 3) { // Allow up to 2 repetitions
+                    uniqueWords.push(word);
+                  }
+                } else {
+                  uniqueWords.push(word);
+                  repeatCount = 0;
+                }
+                lastWord = word;
+              }
+              
+              return uniqueWords.join(' ');
+            })
+            .filter(text => text.length > 5);
+          
+          // Get the longest/most complete text (usually the most recent caption)
+          const allText = captionTexts.length > 0 ? captionTexts[captionTexts.length - 1] : '';
+            
+          console.log(`📄 Cleaned text: "${allText.substring(0, 100)}..." (length: ${allText.length})`);
+          console.log(`📄 Last polled text: "${lastPolledText.substring(0, 50)}..." (length: ${lastPolledText.length})`);
+          
+          // Improved text comparison - check if new text contains significantly different content
+          const textSimilarity = calculateTextSimilarity(allText, lastPolledText);
+          
+          if (allText && textSimilarity < 0.8 && allText.length > 5) {
+            console.log(`📊 NEW CAPTION TEXT DETECTED (similarity: ${textSimilarity.toFixed(2)}): "${allText.substring(0, 100)}..."`);
+            processNewCaption(allText);
+            lastPolledText = allText;
+          } else if (textSimilarity >= 0.8) {
+            console.log(`📄 Similar text as before (similarity: ${textSimilarity.toFixed(2)}), skipping...`);
+          }
+      } else {
+        console.log('❌ No caption elements found during polling');
+        // Show help message occasionally
+        if (Math.random() < 0.1) { // 10% chance
+          console.log('💡 TIP: Make sure captions are enabled on the YouTube video (click the CC button)');
+        }
+      }
+      }, 500); // Poll every 500ms for better caption capture
+    }
     
     if (floatingUI) {
       const status = SITE === 'youtube' ? 'Recording Video...' : 'Recording...';
@@ -808,11 +1004,17 @@ ${transcript}`;
   };
 
   const stopCapture = () => {
+    console.log('🛑 Stopping capture...');
     isCapturing = false;
     
     if (captionObserver) {
       captionObserver.disconnect();
       captionObserver = null;
+    }
+    
+    if (captionPollingInterval) {
+      clearInterval(captionPollingInterval);
+      captionPollingInterval = null;
     }
 
     if (floatingUI) {
@@ -1010,6 +1212,13 @@ ${transcript}`;
   } else {
     initialize();
   }
+
+  // Load Python integration if available
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('extension_integration.js');
+  script.onload = () => console.log('🐍 Python integration loaded');
+  script.onerror = () => console.log('ℹ️  Python integration not available');
+  (document.head || document.documentElement).appendChild(script);
 
   // Cleanup on page unload
   window.addEventListener('beforeunload', cleanup);
