@@ -310,6 +310,10 @@
     return { speaker: null, text };
   };
 
+  // Local storage for transcript data when extension context is invalid
+  let localTranscriptBuffer = [];
+  let contextInvalidNotificationShown = false;
+
   // Utility function to check if extension context is valid
   const isExtensionContextValid = () => {
     try {
@@ -319,11 +323,155 @@
     }
   };
 
-  // Safe message sending with context validation
+  // Store transcript data locally when context is invalid
+  const storeTranscriptLocally = (data) => {
+    localTranscriptBuffer.push({
+      ...data,
+      timestamp: new Date().toISOString(),
+      localId: Date.now() + Math.random()
+    });
+    
+    // Keep only last 100 entries to prevent memory issues
+    if (localTranscriptBuffer.length > 100) {
+      localTranscriptBuffer = localTranscriptBuffer.slice(-100);
+    }
+    
+    console.log('📝 Stored transcript locally:', data.text?.substring(0, 50) + '...');
+  };
+
+  // Show persistent notification about context invalidation
+  const showContextInvalidNotification = () => {
+    if (contextInvalidNotificationShown) return;
+    contextInvalidNotificationShown = true;
+    
+    const notification = document.createElement('div');
+    notification.id = 'mts-context-notification';
+    notification.style.cssText = `
+      position: fixed !important;
+      top: 20px !important;
+      right: 20px !important;
+      background: #ff9800 !important;
+      color: white !important;
+      padding: 16px 20px !important;
+      border-radius: 8px !important;
+      z-index: 2147483647 !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      font-size: 14px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      max-width: 350px !important;
+      border-left: 4px solid #f57c00 !important;
+    `;
+    
+    notification.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 8px;">⚠️ Extension Connection Lost</div>
+      <div style="font-size: 13px; opacity: 0.9; margin-bottom: 10px;">
+        Transcript is being saved locally. Your data won't be lost!
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onclick="window.location.reload()" style="
+          background: rgba(255,255,255,0.2) !important;
+          border: 1px solid rgba(255,255,255,0.3) !important;
+          color: white !important;
+          padding: 6px 12px !important;
+          border-radius: 4px !important;
+          cursor: pointer !important;
+          font-size: 12px !important;
+        ">Refresh Page</button>
+        <button onclick="document.getElementById('mts-context-notification').style.display='none'" style="
+          background: transparent !important;
+          border: 1px solid rgba(255,255,255,0.3) !important;
+          color: white !important;
+          padding: 6px 12px !important;
+          border-radius: 4px !important;
+          cursor: pointer !important;
+          font-size: 12px !important;
+        ">Dismiss</button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+  };
+
+  // Export local transcript data as file
+  const exportLocalTranscript = () => {
+    if (localTranscriptBuffer.length === 0) {
+      console.warn('⚠️ No local transcript data to export');
+      return;
+    }
+    
+    const videoInfo = getYouTubeVideoInfo();
+    const transcript = localTranscriptBuffer
+      .map(entry => `${entry.timestamp} ${entry.speaker ? entry.speaker + ':' : ''} ${entry.text}`)
+      .join('\n\n');
+    
+    const content = `YouTube Video Transcript - Local Backup
+Title: ${videoInfo?.title || 'Unknown'}
+Channel: ${videoInfo?.channel || 'Unknown'}
+URL: ${videoInfo?.url || window.location.href}
+Date: ${new Date().toLocaleDateString()}
+Time: ${new Date().toLocaleTimeString()}
+
+Total Entries: ${localTranscriptBuffer.length}
+
+--- TRANSCRIPT ---
+
+${transcript}`;
+    
+    // Create and download file
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcript_${videoInfo?.title?.replace(/[^a-zA-Z0-9]/g, '_') || 'youtube'}_${Date.now()}.txt`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('📥 Local transcript exported successfully');
+    
+    // Show success message
+    const successMsg = document.createElement('div');
+    successMsg.style.cssText = `
+      position: fixed !important;
+      top: 80px !important;
+      right: 20px !important;
+      background: #4CAF50 !important;
+      color: white !important;
+      padding: 12px 16px !important;
+      border-radius: 6px !important;
+      z-index: 2147483648 !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      font-size: 13px !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+    `;
+    successMsg.textContent = '✅ Transcript downloaded successfully!';
+    document.body.appendChild(successMsg);
+    
+    setTimeout(() => {
+      if (successMsg.parentNode) {
+        successMsg.parentNode.removeChild(successMsg);
+      }
+    }, 3000);
+  };
+
+  // Safe message sending with context validation and local storage fallback
   const safeSendMessage = (message) => {
     return new Promise((resolve, reject) => {
       if (!isExtensionContextValid()) {
-        console.warn('⚠️ Extension context invalidated, skipping message:', message.type);
+        console.warn('⚠️ Extension context invalidated, using local storage for:', message.type);
+        
+        // Store transcript data locally if it's a caption
+        if (message.type === 'NEW_CAPTION' && message.payload) {
+          storeTranscriptLocally(message.payload);
+          showContextInvalidNotification();
+          resolve({ success: true, stored_locally: true });
+          return;
+        }
+        
+        // For other message types, show notification and reject
+        showContextInvalidNotification();
         reject(new Error('Extension context invalidated'));
         return;
       }
@@ -332,14 +480,30 @@
         chrome.runtime.sendMessage(message, (response) => {
           if (chrome.runtime.lastError) {
             console.warn('⚠️ Runtime error:', chrome.runtime.lastError.message);
-            reject(new Error(chrome.runtime.lastError.message));
+            
+            // If it's a caption and we get a runtime error, store locally
+            if (message.type === 'NEW_CAPTION' && message.payload) {
+              storeTranscriptLocally(message.payload);
+              showContextInvalidNotification();
+              resolve({ success: true, stored_locally: true });
+            } else {
+              reject(new Error(chrome.runtime.lastError.message));
+            }
           } else {
             resolve(response);
           }
         });
       } catch (error) {
         console.warn('⚠️ Failed to send message:', error);
-        reject(error);
+        
+        // If it's a caption and we get an error, store locally
+        if (message.type === 'NEW_CAPTION' && message.payload) {
+          storeTranscriptLocally(message.payload);
+          showContextInvalidNotification();
+          resolve({ success: true, stored_locally: true });
+        } else {
+          reject(error);
+        }
       }
     });
   };
@@ -451,6 +615,10 @@
         <button id="mts-export-btn" class="mts-btn mts-btn-success" title="Export Current Transcript" style="margin-left: 8px;">
           <span class="mts-icon">💾</span>
           <span class="mts-text">Export</span>
+        </button>
+        <button id="mts-local-export-btn" class="mts-btn mts-btn-warning" title="Download Local Transcript" style="margin-left: 8px; display: none;">
+          <span class="mts-icon">📥</span>
+          <span class="mts-text">Local</span>
         </button>
       </div>
       <div id="mts-status" class="mts-status"></div>
